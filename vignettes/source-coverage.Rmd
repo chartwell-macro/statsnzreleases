@@ -1,0 +1,138 @@
+---
+title: "Source coverage and release families"
+author: "Chartwell Macro"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Source coverage and release families}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  width = 78
+)
+```
+
+Stats NZ distributes release data through several generations of
+information-release pages and attachment formats. `statsnzreleases` provides a
+documented manifest of release families, with an explicit attachment and parser
+rule for each supported workflow.
+
+## What the manifest records
+
+The complete manifest is available offline.  It records each family's support
+status, expected publication frequency, title pattern, file-selection rule,
+and a short note about the adapter.
+
+```{r manifest}
+manifest <- statsnzreleases::statsnz_releases(include_unsupported = TRUE)
+manifest[, c(
+  "release_id", "release_name", "frequency", "supported", "note"
+)]
+```
+
+To list only families that the current package version can import:
+
+```{r supported}
+supported <- statsnzreleases::statsnz_releases(include_unsupported = FALSE)
+supported[, c("release_id", "release_name", "frequency")]
+```
+
+The supported adapters cover Consumers Price Index, Gross Domestic
+Product, Electronic Card Transactions, Retail Trade Survey, Balance of
+Payments and International Investment Position, Labour Market Statistics, and
+Overseas Merchandise Trade.  The manifest is the source of truth for the
+installed version. Each live read validates the current release page and file
+names before importing, which makes changed historical attachments visible as
+typed errors.
+
+## Attachment formats
+
+The adapters select official attachments by family-specific rules:
+
+- CSV release tables are parsed as character data first, then standardised
+  with numeric values, periods, labels, and source columns.
+- ZIP releases are inspected for safe CSV members before extraction.
+- The Labour Market Statistics ZIP reader retains a curated, memory-aware set
+  of quarterly HLFS, QES, and LCI headline series.
+- Overseas Merchandise Trade workbooks are read through the package's curated
+  monthly and quarterly headline/category tables.
+
+Before a read, inspect the live page's attachments when needed.  This example
+is intentionally conditional so vignette builds remain offline:
+
+```{r inspect-live}
+if (interactive()) {
+  attachment_table <- statsnzreleases::statsnz_release_files(
+    paste0(
+      "https://www.stats.govt.nz/information-releases/",
+      "gross-domestic-product-march-2026-quarter/"
+    )
+  )
+  attachment_table[, c("name", "title", "extension", "stated_size", "url")]
+}
+```
+
+## Output contract
+
+All supported readers return a tibble with class `statsnz_release_data`.
+Common fields include:
+
+```{r output-contract, results='asis'}
+fields <- data.frame(
+  field = c(
+    "release_id", "release_name", "frequency", "series_reference",
+    "series_label", "period", "period_date", "data_value",
+    "data_value_raw", "source_file", "source_attachment_url"
+  ),
+  meaning = c(
+    "Manifest identifier", "Human-readable family name", "Manifest frequency",
+    "Exact source series reference", "Best available series description",
+    "Original period label", "Parsed Date representation",
+    "Numeric observation when conversion succeeds", "Original observation text",
+    "Selected attachment name", "Official attachment URL"
+  ),
+  stringsAsFactors = FALSE
+)
+knitr::kable(fields)
+```
+
+Additional source columns are retained when present, and missing standard
+columns are represented as `NA`.  Duplicate series-period observations are
+de-duplicated during standardisation.  `statsnz_provenance()` should be stored
+alongside the table when a result is used outside the current R session.
+
+## Release files and Aotearoa Data Explorer
+
+Stats NZ is transitioning data from older dissemination tools into the
+[Aotearoa Data Explorer](https://explore.data.stats.govt.nz/). The Data
+Explorer and its API provide dataset discovery and custom table queries. The
+[Stats NZ API Portal](https://portal.apis.stats.govt.nz/) requires users to
+register, subscribe to the API product, and send a subscription key with API
+requests.
+
+`statsnzreleases` has a narrower release-file contract. It does not call the
+Data Explorer catalogue or data endpoints and has no subscription-key option.
+Its only JSON discovery request is to the separate, public Stats NZ website
+release-calendar endpoint. It then reads the selected information-release page
+and downloads the page's official CSV, ZIP, or XLSX attachments.
+
+The same statistical topic may be present in both systems. Choose Data
+Explorer for a custom query against a dataset available there. Choose
+`statsnzreleases` when you need a supported release's published file, its page
+context, the package's family-specific parser, or attachment-level hashes and
+provenance. The package does not silently fall back to Data Explorer because
+doing so could change the output schema, revision state, and source identity.
+
+## Scope and limitations
+
+Coverage is defined by the installed manifest; unsupported families are not
+inferred, credentials are not required, and third-party mirrors are outside
+scope. If Stats NZ removes or replaces the attachments for a supported family,
+the existing typed page or attachment error makes that change visible rather
+than changing access paths implicitly. For a new or migrated source, inspect
+the manifest and email chartwellmacro@gmail.com with the official release family and current
+access path so that coverage can be assessed explicitly.

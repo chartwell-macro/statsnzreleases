@@ -1,0 +1,61 @@
+url: https://chartwell-macro.github.io/statsnzreleases
+
+repo:
+  url:
+    home: https://github.com/chartwell-macro/statsnzreleases/
+    source: https://github.com/chartwell-macro/statsnzreleases/blob/main/
+    issue: mailto:chartwellmacro@gmail.com
+    user: https://github.com/
+  branch: main
+
+template:
+  bootstrap: 5
+  light-switch: true
+
+navbar:
+  structure:
+    left: [reference, articles, news]
+    right: [search, github, lightswitch]
+  components:
+    github:
+      icon: fab fa-github
+      aria-label: Source code on GitHub
+      href: https://github.com/chartwell-macro/statsnzreleases
+
+reference:
+  - title: Package overview
+    desc: Scope, supported sources, and the recommended workflow.
+    contents:
+      - statsnzreleases-package
+  - title: Discover release families
+    desc: Find supported release families and identify the latest published page.
+    contents:
+      - statsnz_releases
+      - statsnz_latest_release
+  - title: Import and filter data
+    desc: Read standardised time-series tables and inspect their provenance.
+    contents:
+      - read_statsnz_release
+      - print.statsnz_release_data
+      - statsnz_provenance
+  - title: Inspect release pages
+    desc: Discover the official files attached to an information release.
+    contents:
+      - statsnz_release_files
+  - title: Cache and reproducibility
+    desc: Locate the package-managed cache used for downloaded attachments.
+    contents:
+      - statsnz_cache_dir
+
+articles:
+  - title: Guides
+    navbar: Guides
+    contents:
+      - getting-started
+      - release-discovery-reproducibility
+      - source-coverage
+      - troubleshooting
+
+news:
+  one_page: true
+  cran: false

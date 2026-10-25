@@ -1,0 +1,124 @@
+---
+title: "Release discovery and reproducible reads"
+author: "Chartwell Macro"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Release discovery and reproducible reads}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  width = 78
+)
+```
+
+This guide explains the two ways to select a Stats NZ release:
+
+1. let the package search the official release calendar, or
+2. provide an explicit information-release URL for a reproducible historical
+   read.
+
+## Calendar discovery
+
+`statsnz_latest_release()` searches release-calendar months from newest to
+oldest, applies the release family's title rule, and returns the newest page
+published on or before `as_of`.  Calendar discovery therefore needs network
+access and can change as Stats NZ publishes new releases.
+
+```{r calendar-live}
+if (interactive()) {
+  latest_cpi <- statsnzreleases::statsnz_latest_release(
+    "nz_stats_cpi",
+    as_of = Sys.Date(),
+    lookback_months = 18L
+  )
+  latest_cpi
+}
+```
+
+Use a smaller `lookback_months` when a workflow has a known publication window.
+The argument is bounded by the package to prevent an unintentional unbounded
+calendar search.  If no matching page is found, the package reports a typed
+`statsnz_release_not_found` error after recording the first request failure in
+the message when one is available.
+
+## Explicit historical pages
+
+For analysis that must be repeatable, record the exact page URL and pass it to
+`read_statsnz_release()`.  The reader still validates that the page belongs to
+the requested release family before selecting attachments.
+
+```{r explicit-live}
+if (interactive()) {
+  historical_gdp <- statsnzreleases::read_statsnz_release(
+    "nz_stats_gdp",
+    release_url = paste0(
+      "https://www.stats.govt.nz/information-releases/",
+      "gross-domestic-product-march-2026-quarter/"
+    ),
+    series = "SNEA.SG00NAC00B15",
+    start_period = "2020.03",
+    end_period = "2025.12",
+    quiet = FALSE
+  )
+  head(historical_gdp)
+}
+```
+
+The period bounds are inclusive and accept annual (`YYYY`) or sub-annual
+(`YYYY.MM`) values.  `series` matches exact Stats NZ series references.  The
+result remains a `statsnz_release_data` tibble, so filtering does not discard
+its release and attachment provenance.
+
+## Files before data
+
+When you need to inspect an information-release page before choosing a read,
+use `statsnz_release_files()`.  It returns the attachment name, title,
+extension, stated size, and official HTTPS URL.  This is also a useful first
+diagnostic when a page has changed its attachment layout.
+
+```{r files-live}
+if (interactive()) {
+  files <- statsnzreleases::statsnz_release_files(
+    paste0(
+      "https://www.stats.govt.nz/information-releases/",
+      "gross-domestic-product-march-2026-quarter/"
+    )
+  )
+  files[, c("name", "title", "extension", "url")]
+}
+```
+
+## Cache and provenance
+
+Attachments are cached below `statsnz_cache_dir()` using a URL fingerprint and
+release family.  A cached non-empty file is reused unless `refresh = TRUE`.
+For a reproducible project, either leave the default cache in place and record
+its provenance or pass a project-managed cache directory explicitly:
+
+```{r cache}
+cache_dir <- file.path(tempdir(), "statsnzreleases-example-cache")
+basename(statsnzreleases::statsnz_cache_dir())
+basename(cache_dir)
+```
+
+After a successful read, store the result of
+`statsnz_provenance(data)` with the analysis outputs.  In addition to the page
+URL and retrieval time, the attachment table records local paths, byte sizes,
+and SHA-256 hashes, making it possible to detect a changed download.
+
+## Network and credentials
+
+Requests are restricted to official `https://www.stats.govt.nz` URLs and use a
+bounded connect/request timeout.  The package does not require credentials or
+perform installation-time downloads.  A populated cache can avoid
+re-downloading an attachment once its page metadata has been retrieved, but
+the reader still fetches the information-release page before selecting files.
+For a fully offline demonstration, [Getting started](getting-started.html)
+feeds an installed, attributed CPI snapshot through the same public reader and
+parser path. See [Troubleshooting](troubleshooting.html) for typed errors and
+offline checks.

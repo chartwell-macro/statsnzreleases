@@ -1,0 +1,15 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rcheck
+*.tar.gz
+README.html
+inst/pkgdown.yml
+.DS_Store
+docs/
+pkgdown/
+coverage/
+revdep/
+benchmarks/
+benchmark/

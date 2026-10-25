@@ -1,0 +1,110 @@
+---
+title: "Troubleshooting offline and changed releases"
+author: "Chartwell Macro"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Troubleshooting offline and changed releases}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  width = 78
+)
+```
+
+The package reports typed conditions for three common situations: registry
+selection, changed information-release pages or attachments, and unavailable
+official network resources. The checks below distinguish these cases without
+matching complete message text.
+
+## Check the installed registry first
+
+An unknown release ID fails locally before any network request.  Inspect the
+registry and use one of its `release_id` values:
+
+```{r unknown-release}
+unknown <- tryCatch(
+  statsnzreleases::statsnz_latest_release("nz_stats_not_real"),
+  error = identity
+)
+c(class = class(unknown)[[1L]], message = conditionMessage(unknown))
+```
+
+Use `include_unsupported = FALSE` to present only the families that the current
+package version can pass to `read_statsnz_release()`. The full registry retains
+deferred families for visibility and planning.
+
+## Check a page before reading it
+
+An explicit `release_url` must be an official Stats NZ information-release URL,
+and the page title must match the selected release family.  When a page is
+updated or a wrong family is supplied, inspect its attachments first:
+
+```{r files-live}
+if (interactive()) {
+  files <- statsnzreleases::statsnz_release_files(
+    paste0(
+      "https://www.stats.govt.nz/information-releases/",
+      "gross-domestic-product-march-2026-quarter/"
+    )
+  )
+  files[, c("name", "title", "extension", "url")]
+}
+```
+
+Useful typed failures include `statsnz_release_mismatch` (the page belongs to
+another family), `statsnz_attachments_not_found` (no downloadable files were
+detected), and `statsnz_attachment_mismatch` (the page has files, but none
+matches the family rule).  These indicate a source-layout change or an
+incorrect URL rather than a parsing problem.
+
+## Network and cache checks
+
+Calendar discovery and attachment reads need access to official HTTPS URLs.
+The package uses bounded request timeouts and does not require credentials.  A
+request failure is reported as `statsnz_request_error`, an HTTP response outside
+the 2xx range as `statsnz_http_error`, and an attachment download failure as
+`statsnz_download_error`.
+
+```{r cache}
+cache <- statsnzreleases::statsnz_cache_dir()
+basename(cache)
+```
+
+Pass the same `cache_dir` to later reads to reuse a non-empty downloaded file.
+Use `refresh = TRUE` only when you intentionally want to retrieve the
+attachment again.  Do not place credentials in a URL or commit cache files;
+the cache contains downloaded source files and is managed outside the package
+source tree by default.
+
+## Validate an imported object
+
+`statsnz_provenance()` checks that its input carries the package's provenance
+attribute.  This catches accidental loss of metadata when a result is copied
+into a different object:
+
+```{r provenance-error}
+missing_provenance <- tryCatch(
+  statsnzreleases::statsnz_provenance(tibble::tibble(value = 1)),
+  error = identity
+)
+c(
+  class = class(missing_provenance)[[1L]],
+  message = conditionMessage(missing_provenance)
+)
+```
+
+When `read_statsnz_release()` applies its `series`, `start_period`, or
+`end_period` filters, the package preserves provenance on the result.  If a
+downstream transformation drops attributes, retain the original object or save
+`statsnz_provenance()` before transforming it.
+
+## A reproducible support request
+
+When reporting a failure, include the package version, R version, release ID,
+explicit page URL (if used), date/time, and the typed error class.  Do not
+include private cache contents or credentials.  Email support requests to <mailto:chartwellmacro@gmail.com>.

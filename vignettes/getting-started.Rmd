@@ -1,0 +1,176 @@
+---
+title: "Getting started with statsnzreleases"
+author: "Chartwell Macro"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with statsnzreleases}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  width = 78
+)
+helper_candidates <- c(
+  "cpi-chart-example.R",
+  file.path("vignettes", "cpi-chart-example.R")
+)
+helper <- helper_candidates[file.exists(helper_candidates)][[1L]]
+source(helper)
+cpi <- NULL
+if (requireNamespace("testthat", quietly = TRUE)) {
+  cpi <- statsnz_example_cpi()
+}
+```
+
+`statsnzreleases` turns selected Stats NZ information-release attachments into
+standardised time-series tables. This guide follows a complete workflow:
+discover a supported family, retrieve representative official CPI series
+through the public reader, chart the `period_date` and `data_value` columns,
+and retain provenance for later reproduction.
+
+## Which Stats NZ access path does this guide use?
+
+This guide uses Stats NZ's information-release path, not the Aotearoa Data
+Explorer data API. `statsnz_latest_release()` calls a separate,
+credential-free release-calendar endpoint on `www.stats.govt.nz`; the reader
+then fetches the selected release page and its attached official files. It
+does not send a Data Explorer query or use an API subscription key.
+
+Use the [Aotearoa Data Explorer API guide](https://portal.apis.stats.govt.nz/api-guide)
+when you need a custom dimensional query from a dataset published there. Use
+this package when you need one of its supported published-release file
+workflows, standardised output, and attachment-level provenance. The Source
+coverage article describes this boundary and the package's behaviour as Stats
+NZ continues moving datasets between dissemination systems.
+
+## 1. Discover a supported release family
+
+The release registry is packaged with the installed package, so this first
+step works without a network connection.  Use `include_unsupported = FALSE`
+when you want only families that the current release can import.
+
+```{r registry}
+catalogue <- statsnzreleases::statsnz_releases(include_unsupported = FALSE)
+catalogue[, c("release_id", "release_name", "frequency", "supported")]
+```
+
+The `release_id` is the stable identifier used by
+`read_statsnz_release()`. The catalogue records the release families, support
+status, frequencies, and matching rules provided by this installed version.
+
+## 2. Retrieve and chart a time series
+
+The live workflow searches a bounded window in the official release calendar,
+then passes the selected page URL to the public reader. The exact series and
+period bounds make the requested table explicit. Run this chunk interactively
+when official network access is available:
+
+```{r live-read}
+if (interactive()) {
+  latest_cpi <- statsnzreleases::statsnz_latest_release(
+    "nz_stats_cpi",
+    as_of = as.Date("2026-08-24"),
+    lookback_months = 2L
+  )
+  cpi_live <- statsnzreleases::read_statsnz_release(
+    "nz_stats_cpi",
+    release_url = latest_cpi$url[[1L]],
+    series = c("CPIQ.SE9NS6000", "CPIQ.SE9NS6500"),
+    start_period = "2016.03",
+    end_period = "2026.06",
+    quiet = TRUE
+  )
+  cpi_live[, c("series_reference", "period_date", "data_value")]
+}
+```
+
+For deterministic offline rendering, this guide feeds an installed official
+snapshot from [*Consumers price index: June 2026 quarter*](https://www.stats.govt.nz/information-releases/consumers-price-index-june-2026-quarter/)
+through the same
+public reader, attachment selector, parser, standardiser, filters, class, and
+provenance path. Only the release-page lookup and download transport are
+replaced. The snapshot contains 84 official quarterly observations for
+`CPIQ.SE9NS6000` (Tradable All Groups) and `CPIQ.SE9NS6500` (Non-Tradable All
+Groups) from March 2016 through June 2026. Its installed provenance record
+documents the release and attachment URLs, full-file and extract hashes, and
+extraction. The extract includes Stats NZ data licensed by Stats NZ for reuse
+under CC BY 4.0; the installed record provides the full attribution.
+
+```{r snapshot-output}
+if (is.null(cpi)) {
+  cat("Install the suggested package `testthat` to run the offline reader demonstration.\n")
+} else {
+  cpi[, c(
+    "series_reference", "period", "data_value", "series_label", "release_id"
+  )]
+}
+```
+
+The returned object is a tibble with class `statsnz_release_data`.  Its core
+columns include the release identity, series reference and label, period and
+period date, numeric and raw values, units, and source attachment fields.
+Filtering preserves the release provenance attribute.
+
+The output is already long-form, so base row and column selection is sufficient
+for plotting:
+
+```{r chart-data, eval=!is.null(cpi)}
+chart_data <- cpi[
+  !is.na(cpi$period_date) & !is.na(cpi$data_value),
+  c("period_date", "data_value", "series_label")
+]
+utils::head(chart_data, 4L)
+```
+
+```{r cpi-chart, eval=!is.null(cpi), fig.width=8, fig.height=4.8, dpi=120, out.width="100%", fig.alt="Line chart of New Zealand tradable and non-tradable CPI indexes from March 2016 to June 2026. Both rise after 2020, with the non-tradable index ending higher."}
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  ggplot2::ggplot(
+    chart_data,
+    ggplot2::aes(
+      x = period_date, y = data_value,
+      colour = series_label, group = series_label
+    )
+  ) +
+    ggplot2::geom_line() +
+    ggplot2::labs(
+      title = "Tradable and non-tradable consumer prices",
+      subtitle = "Quarterly published observations",
+      x = "Quarter",
+      y = "CPI index",
+      colour = "CPI series",
+      caption = "Source: Stats NZ, Consumers price index: June 2026 quarter"
+    ) +
+    ggplot2::theme_minimal(base_size = 13)
+}
+```
+
+## 3. Inspect provenance and the cache
+
+Every downloaded attachment is represented in the provenance returned by
+`statsnz_provenance()`.  The record includes the release page, retrieval time,
+attachment URLs, local cache paths, byte sizes, and SHA-256 hashes.
+
+```{r provenance, eval=TRUE}
+if (!is.null(cpi)) {
+  provenance <- statsnzreleases::statsnz_provenance(cpi)
+  provenance[c("release_id", "release_name", "release_title", "release_url")]
+  provenance$attachments[, c("name", "bytes", "sha256")]
+}
+```
+
+The default cache location follows R's user-cache conventions through
+`tools::R_user_dir()`.  It is outside the project source tree and is created
+when a download needs it rather than during package loading.
+
+```{r cache}
+basename(statsnzreleases::statsnz_cache_dir())
+```
+
+Pass `cache_dir` explicitly when a workflow needs a managed cache location, and
+use `refresh = TRUE` when you intentionally want to download the selected
+attachments again. See [Reproducible reads](release-discovery-reproducibility.html)
+for historical URLs, filtering, network boundaries, and cache guidance.

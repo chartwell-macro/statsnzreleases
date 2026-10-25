@@ -1,0 +1,8 @@
+bibentry(
+  bibtype = "Manual",
+  title = "statsnzreleases: Import and Standardise Stats NZ Economic Release Files",
+  author = person(given = "Chartwell", family = "Macro"),
+  year = "2026",
+  note = "R package version 0.2.1",
+  url = "https://github.com/chartwell-macro/statsnzreleases"
+)
