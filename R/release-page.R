@@ -154,6 +154,11 @@ snz_select_attachments <- function(files, release) {
       release_id = release$release_id[[1L]]
     )
   }
+  if (identical(release$release_id[[1L]],"nz_stats_trade")) {
+    primary <- grepl("^overseas-merchandise-trade-[a-z]+-[0-9]{4}([_-]v[0-9]+)?[.]xlsx$",result$name,ignore.case=TRUE)
+    result <- result[primary,,drop=FALSE]
+    if(nrow(result)!=1L)snz_stop("Trade release did not identify one primary workbook.",class="statsnz_attachment_mismatch")
+  }
   rank <- snz_attachment_priority(
     result$name,
     release$attachment_preference[[1L]]

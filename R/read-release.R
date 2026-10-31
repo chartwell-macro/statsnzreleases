@@ -15,6 +15,11 @@
 #' @param cache_dir Directory for downloaded official attachments.
 #' @param refresh Download attachments again even when cached.
 #' @param quiet Suppress download progress.
+#' @param history Use `auto` for full histories on latest reads and release-only
+#'   data for explicit historical URLs, `full` to request official full-history
+#'   backfills, or `release` to use only the chosen release attachments.
+#'   Infoshare backfills for trade and migration require the current release;
+#'   historical release URLs use their original attachments without a live splice.
 #'
 #' @return A `statsnz_release_data` tibble with standardised columns and
 #'   attachment provenance.
@@ -29,7 +34,10 @@ read_statsnz_release <- function(
     end_period = NULL,
     cache_dir = statsnz_cache_dir(),
     refresh = FALSE,
-    quiet = FALSE) {
+    quiet = FALSE,
+    history = c("auto", "full", "release")) {
+  history <- match.arg(history)
+  if (history == "auto") history <- if (is.null(release_url)) "full" else "release"
   release <- snz_release_definition(release_id)
   if (is.null(release_url)) {
     latest <- snz_latest_release(release, as_of, lookback_months)
@@ -39,6 +47,16 @@ read_statsnz_release <- function(
     release_url,
     information_release = TRUE
   )
+
+  if (history == "full" && release_id %in% c("nz_stats_trade", "nz_stats_international_migration")) {
+    current <- snz_latest_release(release, Sys.Date(), lookback_months)$url[[1L]]
+    if (!identical(sub("/+$", "", release_url), sub("/+$", "", current))) {
+      snz_stop(
+        "Full Infoshare history is available only for the current release. Use history = 'release' for an older vintage.",
+        class = "statsnz_history_vintage_error", release_id = release_id, url = release_url
+      )
+    }
+  }
 
   files <- statsnz_release_files(release_url)
   release_title <- snz_scalar(files$release_title)
@@ -105,6 +123,7 @@ read_statsnz_release <- function(
     attachment_provenance = attachment_provenance,
     retrieved_at = retrieved_at
   )
+  if (history == "full") result <- snz_add_full_history(result,release)
   snz_filter_observations(result, series, start_period, end_period)
 }
 

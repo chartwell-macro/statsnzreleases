@@ -54,3 +54,20 @@ test_that("calendar month sequence is bounded and deterministic", {
     class = "statsnz_invalid_argument"
   )
 })
+
+test_that("quarterly BOP discovery cannot select a newer annual workbook", {
+  entries <- list(
+    list(Title = "Balance of payments and international investment position: Year ended 31 March 2026",
+         PageLink = "/information-releases/bop-year-ended-31-march-2026/",
+         DateTaxonomyTerm = list(PublicationDate = "2026-09-30 10:45:00")),
+    list(Title = "Balance of payments and international investment position: June 2026 quarter",
+         PageLink = "/information-releases/balance-of-payments-and-international-investment-position-june-2026-quarter/",
+         DateTaxonomyTerm = list(PublicationDate = "2026-09-16 10:45:00")))
+  raw <- charToRaw(jsonlite::toJSON(list(items=list(published=entries)),auto_unbox=TRUE))
+  result <- statsnzreleases:::snz_latest_release(
+    statsnzreleases:::snz_release_definition("nz_stats_balance_payments"),
+    as.Date("2026-10-25"), 2L, fetch_fun=function(url)raw)
+  expect_equal(nrow(result),1L)
+  expect_match(result$url,"june-2026-quarter/")
+  expect_identical(result$publication_date,as.Date("2026-09-16"))
+})

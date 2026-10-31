@@ -14,7 +14,8 @@ read_statsnz_release(
   end_period = NULL,
   cache_dir = statsnz_cache_dir(),
   refresh = FALSE,
-  quiet = FALSE
+  quiet = FALSE,
+  history = c("auto", "full", "release")
 )
 }
 \arguments{
@@ -37,6 +38,8 @@ on or before this date.}
 \item{refresh}{Download attachments again even when cached.}
 
 \item{quiet}{Suppress download progress.}
+
+\item{history}{Use \code{auto} for full histories on latest reads and release-only data for explicit historical URLs, \code{full} for official history backfills, or \code{release} for the chosen attachments only. Infoshare backfills for trade and migration require the current release; historical URLs retain their original attachments.}
 }
 \value{
 A \code{statsnz_release_data} tibble with standardised columns and

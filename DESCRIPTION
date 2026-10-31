@@ -1,6 +1,6 @@
 Package: statsnzreleases
-Title: Import Major Stats NZ Economic Release Files
-Version: 0.2.1
+Title: Import Stats NZ Economic Releases and Histories
+Version: 0.3.1
 Authors@R:
     person("Data Viewer", "Maintainers", email = "maintainers@example.invalid",
            role = c("aut", "cre"))

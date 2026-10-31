@@ -103,6 +103,23 @@ snz_read_attachment <- function(
     source_url,
     release_id = "") {
   extension <- tolower(tools::file_ext(source_name))
+  if (identical(release_id, "nz_stats_building_consents")) {
+    data <- snz_read_bulk_csv(path,"Building consents by region (Monthly).csv",release_id,
+      references=paste0("BLDM.SFTZ",rep(c("1100","1110"),each=3),"A1",rep(c("A","S","T"),2)))
+    data$source_file<-source_name;data$source_attachment_url<-source_url
+    return(list(data))
+  }
+  if (identical(release_id,"nz_stats_business_price_indexes")) {
+    members<-utils::unzip(path,list=TRUE)$Name
+    member<-members[grepl("^business-price-indexes-.*-csv[.]csv$",members)]
+    if(length(member)!=1L)snz_history_stop("Business-price ZIP omitted its exact CSV member.")
+    data<-snz_read_bulk_csv(path,member,release_id,prefix="")
+    data$source_file<-source_name;data$source_attachment_url<-source_url
+    return(list(data))
+  }
+  if (identical(release_id,"nz_stats_international_migration")) {
+    return(list(snz_read_migration_workbook(path,source_name,source_url)))
+  }
   if (identical(release_id, "nz_stats_labour") && extension == "zip") {
     return(snz_read_labour_zip(path, source_url))
   }
@@ -175,9 +192,9 @@ snz_standardise <- function(
     }
   }
 
-  data$data_value_raw <- data$data_value
+  if (!"data_value_raw" %in% names(data)) data$data_value_raw <- data$data_value
   data$data_value <- suppressWarnings(
-    as.numeric(gsub(",", "", data$data_value_raw, fixed = TRUE))
+    as.numeric(gsub(",", "", as.character(data$data_value), fixed = TRUE))
   )
   data$magnitude <- suppressWarnings(as.numeric(data$magnitude))
   data$period_date <- snz_parse_period_date(data$period)
@@ -193,7 +210,7 @@ snz_standardise <- function(
   data$release_id <- release$release_id[[1L]]
   data$release_name <- release$release_name[[1L]]
   data$tier <- as.integer(release$tier[[1L]])
-  data$frequency <- release$frequency[[1L]]
+  if (!"frequency" %in% names(data)) data$frequency <- release$frequency[[1L]]
 
   leading <- c(
     "release_id", "release_name", "tier", "frequency",

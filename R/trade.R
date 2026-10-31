@@ -95,6 +95,7 @@ snz_trade_frame <- function(
   frames <- lapply(seq_along(columns), function(index) {
     column <- columns[[index]]
     data.frame(
+      frequency = tolower(frequency),
       series_reference = references[[index]],
       period = period[keep_rows],
       data_value = as.character(sheet[[column]][keep_rows]),
@@ -250,6 +251,13 @@ snz_read_trade_workbook <- function(path, source_name, source_url) {
     )
   }
 
+  available <- readxl::excel_sheets(path)
+  required <- c("Table 1.02", "Table 2", paste("Table",11:16))
+  quarterly_sheets <- paste("Table",17:20)
+  if (length(setdiff(required,available)) ||
+      (any(quarterly_sheets %in% available) && !all(quarterly_sheets %in% available))) {
+    snz_stop("Trade workbook omitted required monthly sheets or has an incomplete quarterly block.",class="statsnz_workbook_error")
+  }
   actual <- read_sheet("Table 1.02")
   frames <- list(snz_trade_headline_sheet(
     sheet = actual,
@@ -298,6 +306,7 @@ snz_read_trade_workbook <- function(path, source_name, source_url) {
     list("Table 19", 3:13, 9L, 6L, 4L, 7L, "Exports", "Seasonally adjusted", "Quantity", "Quarterly")
   )
   for (specification in grid_specs) {
+    if (!specification[[1L]] %in% available) next
     sheet <- read_sheet(specification[[1L]])
     frames[[length(frames) + 1L]] <- snz_trade_grid_sheet(
       sheet = sheet,
@@ -316,6 +325,7 @@ snz_read_trade_workbook <- function(path, source_name, source_url) {
     )
   }
 
+  if (all(quarterly_sheets %in% available)) {
   quarterly <- read_sheet("Table 17")
   frames[[length(frames) + 1L]] <- snz_trade_headline_sheet(
     sheet = quarterly,
@@ -354,5 +364,6 @@ snz_read_trade_workbook <- function(path, source_name, source_url) {
     prefix_cell = c(7L, 1L)
   )
 
+  }
   snz_bind_rows(frames)
 }
